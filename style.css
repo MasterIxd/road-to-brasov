@@ -1,0 +1,240 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+#app {
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas: "screen" "hint";
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#screen {
+  grid-area: screen;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#stage { position: relative; }
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: #000;
+}
+
+.hidden { display: none !important; }
+
+#prize {
+  position: absolute;
+  left: 0; right: 0;
+  top: 44%;
+  bottom: 2%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2%;
+}
+
+#qr {
+  background: #fff;
+  padding: 1.5%;
+  height: 58%;
+  aspect-ratio: 1;
+}
+#qr canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+
+#claim {
+  font: bold clamp(14px, 4.5vmin, 26px) ui-monospace, Menlo, monospace;
+  color: #000;
+  background: #fcd000;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 0 #a86800;
+  padding: .35em 1.2em;
+  text-decoration: none;
+  letter-spacing: .08em;
+}
+#claim:active { transform: translateY(3px); box-shadow: 0 1px 0 #a86800; }
+
+#prize-note {
+  font-size: clamp(9px, 2.4vmin, 13px);
+  color: #bcbcbc;
+  text-transform: uppercase;
+}
+
+#hint {
+  grid-area: hint;
+  text-align: center;
+  font-size: 12px;
+  color: #7c7c7c;
+  padding: 8px 12px 12px;
+}
+#mute-key { cursor: pointer; text-decoration: underline; }
+#mute-key.off { color: #555; }
+
+/* ---------- on-screen gamepad (touch devices only): the two panels beside the screen ---------- */
+
+.pad { display: none; }
+button { -webkit-appearance: none; appearance: none; font-family: inherit; }
+
+/* phone held upright: ask to rotate, the game waits (see engine.js) */
+#rotate { display: none; }
+
+@media (pointer: coarse) {
+  #hint { display: none; }
+  html, body { background: #0a0a0a; }
+
+  /* NES controller: dark grey face, the screen is the "TV" in the middle */
+  #app {
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-rows: 1fr;
+    grid-template-areas: "left screen right";
+    padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    background: #2a2a2a;
+  }
+  #screen { background: #000; }
+  #stage { box-shadow: 0 0 0 4px #000, 0 0 0 5px #3a3a3a; }
+
+  .pad {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    min-width: 0;
+    background: #2a2a2a;
+  }
+  /* buttons sit next to the screen edges, not next to the game */
+  #pad-left  { grid-area: left;  align-items: flex-start; padding-left: 10px; }
+  #pad-right { grid-area: right; align-items: center; padding-right: 8px; }
+
+  /* ---- D-pad: black cross with embossed arrows and a dimple in the center ---- */
+  #dpad {
+    position: relative;
+    width: 108px;
+    height: 108px;
+    flex: none;
+    filter: drop-shadow(0 3px 0 #0a0a0a);
+  }
+  .d {
+    position: absolute;
+    width: 36px; height: 36px;
+    background: #161616;
+    border: 0;
+    touch-action: none;
+  }
+  .d.up    { left: 36px; top: 0;    border-radius: 6px 6px 0 0; }
+  .d.down  { left: 36px; top: 72px; border-radius: 0 0 6px 6px; }
+  .d.left  { left: 0;    top: 36px; border-radius: 6px 0 0 6px; }
+  .d.right { left: 72px; top: 36px; border-radius: 0 6px 6px 0; }
+  .d.center { left: 36px; top: 36px; }
+  .d.center::after {
+    content: '';
+    position: absolute;
+    left: 9px; top: 9px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #2e2e2e, #0c0c0c 70%);
+  }
+  /* embossed arrow on each arm */
+  .d.up::after, .d.down::after, .d.left::after, .d.right::after {
+    content: '';
+    position: absolute;
+    width: 0; height: 0;
+    border: 7px solid transparent;
+  }
+  .d.up::after    { left: 11px; top: 5px;  border-bottom-color: #3c3c3c; border-top: 0; }
+  .d.down::after  { left: 11px; bottom: 5px; border-top-color: #3c3c3c; border-bottom: 0; }
+  .d.left::after  { top: 11px; left: 5px;  border-right-color: #3c3c3c; border-left: 0; }
+  .d.right::after { top: 11px; right: 5px; border-left-color: #3c3c3c; border-right: 0; }
+  .d.pressed { background: #2c2c2c; }
+  /* up/down do nothing on side-scrolling levels: their arrows fade */
+  body:not(.four-way) .d.up::after,
+  body:not(.four-way) .d.down::after { opacity: .3; }
+
+  /* ---- SELECT / START style pills with red labels, A centered under them ---- */
+  #mid { display: flex; gap: 14px; justify-content: center; }
+  .pill-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pill {
+    width: 46px; height: 16px;
+    background: #141414;
+    border: 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 0 #0a0a0a;
+    touch-action: none;
+  }
+  .pill.pressed { background: #2c2c2c; box-shadow: none; transform: translateY(2px); }
+  .lbl {
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: .08em;
+    color: #c8102e;
+    pointer-events: none;
+  }
+  #mute.off + .lbl { color: #5a2026; text-decoration: line-through; }
+
+  /* ---- A button: red dome in a dark well ---- */
+  #ab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 9px 6px;
+    background: #1c1c1c;
+    border-radius: 12px;
+    box-shadow: inset 0 2px 0 #0e0e0e;
+  }
+  .btn {
+    width: 58px; height: 58px;
+    border-radius: 50%;
+    border: 0;
+    background: radial-gradient(circle at 38% 32%, #ff5a5a, #c8102e 55%, #8c0a1e);
+    box-shadow: 0 4px 0 #5c0814, inset 0 -2px 0 rgba(0, 0, 0, .25);
+    touch-action: none;
+  }
+  .btn.pressed { transform: translateY(3px); box-shadow: 0 1px 0 #5c0814; background: radial-gradient(circle at 38% 32%, #ff6a6a, #d82040 55%, #9c1428); }
+
+  @media (orientation: portrait) {
+    #rotate {
+      display: flex;
+      position: fixed; inset: 0; z-index: 10;
+      flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+      background: #000;
+      color: #fcd000;
+      font-weight: bold;
+      font-size: 16px;
+      letter-spacing: .1em;
+    }
+    #rotate .phone {
+      width: 56px; height: 96px;
+      border: 5px solid #fff; border-radius: 10px;
+      animation: turn 2s ease-in-out infinite;
+    }
+  }
+}
+
+@keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
