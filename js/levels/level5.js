@@ -88,7 +88,7 @@
         parts = parts.filter(q => q.t < 120);
 
         if (quoteT > 0) quoteT--;
-        if (state === 'intro') { if (stateT > 150 || (stateT > 20 && Input.ok())) { state = 'fight'; stateT = 0; speak(BOSS_HP); } return; }
+        if (state === 'intro') { if (stateT > 20 && (Input.pressed.a || Input.pressed.tap)) { state = 'fight'; stateT = 0; speak(BOSS_HP); } return; }
 
         if (state === 'dead') {
           p.vy += 0.3; p.y += p.vy;
@@ -254,12 +254,13 @@
           else if (boss.inv <= 0) Game.text('HIT THE ? BLOCK!', 128, 36, '#fff', 1, 'center', '#000');
         }
         if (state === 'intro') {
-          Game.box(28, 74, 200, 70);
+          Game.box(28, 74, 200, 86);
           Game.text('BOSS: ' + CONFIG.from, 128, 84, '#d82800', 1, 'center');
           Game.text("DOESN'T WANT YOU TO LEAVE!", 128, 96, '#fff', 1, 'center');
           Game.text('HIT THE ? BLOCK FOR FRESH AIR', 128, 108, '#fcd000', 1, 'center');
           Game.text('THEN JUMP ON ITS HEAD 3 TIMES', 128, 120, '#fcd000', 1, 'center');
           Game.text('DODGE ITS TRAFFIC AND SMOG', 128, 132, '#7c7c7c', 1, 'center');
+          if (stateT > 20 && Game.blink(0.4)) Game.text('PRESS A', 128, 147, '#fff', 1, 'center');
         }
         if (state === 'won' && stateT > 80 && cake) {
           Game.text('GRAB THE CAKE!', 128, 80, '#fcd000', 2, 'center', '#000');
