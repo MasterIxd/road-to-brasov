@@ -10,7 +10,7 @@ window.CONFIG = {
   // Prize link in base64 so it does not show up in plain text.
   // Encode in Terminal:  echo -n 'https://...' | base64
   // Empty string = final screen says the link is not set yet.
-  prizeLinkB64: 'aHR0cHM6Ly9leGFtcGxlLmNvbS90ZXN0LXByaXplLWxpbms=', // TEST LINK, replace with the real Revolut link before sending
+  prizeLinkB64: 'aHR0cHM6Ly9yZXZvbHV0Lm1lL3AvejNPTFR1eml0RA==',
 
   // Level 2 (quiz battle vs TRAIN DELAY). 2-4 options each, `answer` = index of the right option (0-based).
   // A question wraps at 34 characters; three lines is the most that fits together with four options.
