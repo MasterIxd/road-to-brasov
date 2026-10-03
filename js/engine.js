@@ -78,17 +78,27 @@
   // ---------------- title screen ----------------
   function TitleScene(startAt) {
     let heroX = -20, frame = 0;
+    // with saved progress the title offers a choice instead of PRESS START
+    const menu = startAt > 0 ? ['CONTINUE', 'NEW GAME'] : null;
+    const MENU_Y = 154, MENU_H = 14;
+    let cursor = 0;
     return {
       wide: true,
       noPause: true,
+      fourWay: !!menu, // the choice needs up/down on the touch pad
       music: undefined, // no music until first input (iOS needs a gesture)
       update() {
         heroX += 0.8; if (heroX > Game.W + 20) heroX = -20;
         frame += 0.15;
+        if (menu && (Input.pressed.up || Input.pressed.down)) { cursor = 1 - cursor; GameAudio.sfx('select'); }
+        if (menu && Input.pressed.tap) {
+          const row = Math.floor((Input.tapY - MENU_Y + 4) / MENU_H);
+          if (row >= 0 && row < menu.length) cursor = row; // a tap elsewhere confirms the highlighted line
+        }
         if (Input.ok()) {
           GameAudio.unlock();
           GameAudio.sfx('confirm');
-          Game.startLevel(startAt);
+          Game.startLevel(menu && cursor === 1 ? 0 : startAt);
         }
       },
       draw() {
@@ -106,8 +116,14 @@
         Game.text('ROAD TO', W / 2, 78, '#fff', 2, 'center', '#000');
         Game.text(CONFIG.to, W / 2, 98, '#fcd000', 3, 'center', '#000');
 
-        if (Game.blink(0.5)) {
-          Game.text(startAt > 0 ? 'PRESS START TO CONTINUE' : 'PRESS START', W / 2, 152, '#fcd000', 1, 'center', '#000');
+        if (menu) {
+          menu.forEach((s, k) => {
+            const y = MENU_Y + k * MENU_H, on = k === cursor;
+            Game.text(s, W / 2, y, on ? '#fcd000' : '#fff', 1, 'center', '#000');
+            if (on && Game.blink(0.3)) Game.text('>', W / 2 - Font.width(s) / 2 - 10, y, '#fcd000', 1, 'left', '#000');
+          });
+        } else if (Game.blink(0.5)) {
+          Game.text('PRESS START', W / 2, 152, '#fcd000', 1, 'center', '#000');
         }
         Game.text(CONFIG.from + ' → ' + CONFIG.to, W / 2, 138, '#fff', 1, 'center', '#000');
 
@@ -123,7 +139,6 @@
     let timer = 0;
     return {
       music: null,
-      noPause: true,
       update() {
         timer++;
         if (timer > 170 || (timer > 20 && Input.ok())) Game.go(Game.levels[i]());
