@@ -159,7 +159,9 @@
         }
 
         if (Plat.overlap(p, boss)) {
-          const stomp = p.vy > 0 && p.y + p.h - boss.y < 12;
+          // a dizzy boss can stand under the middle platform, where nobody fits on its head:
+          // then falling onto its upper half counts too
+          const stomp = p.vy > 0 && p.y + p.h - boss.y < (boss.stun > 0 ? 26 : 12);
           if (stomp && boss.stun > 0 && boss.inv <= 0) {
             boss.hp--; boss.inv = 80; boss.stun = 0;
             speak(boss.hp);

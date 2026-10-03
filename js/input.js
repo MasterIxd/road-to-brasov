@@ -104,6 +104,7 @@
       const el = document.elementFromPoint(t.x, t.y);
       const btn = el && el.closest('[data-key]');
       if (btn) { next[btn.dataset.key] = true; continue; }
+      if (el === canvas || (el && el.closest('#mid'))) continue; // the screen and the SOUND / START row never count as A
       // a thumb that lands just off A or B still presses the nearest one
       let best = null, bestD = 60;
       for (const b of abButtons) {

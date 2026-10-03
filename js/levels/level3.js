@@ -36,6 +36,7 @@
     const start = find('P'), keyPos = find('K'), doorPos = find('D');
     let p, slimes, hearts, hasKey = false, keyShow = 0, doorOpen = false;
     let msg = null, msgT = 0, state = 'play', stateT = 0, swing = 0, poofs = [];
+    let turn = 'x'; // axis of the direction pressed last: with two directions held it is tried first
 
     const blocked = (tx, ty) => {
       if (ty < 0) return false;
@@ -56,8 +57,35 @@
       return stuck;
     }
 
+    // The hero walks along lanes: one line through the middle of each row and column, no sideways slack.
+    // LX / LY = where the 10x10 hero box sits inside a tile when it is on the lane.
+    const LX = 3, LY = 5;
+    const col = () => Math.round((p.x - LX) / T), row = () => Math.round((p.y - OY - LY) / T);
+    // one step along a lane: line up with the row (or column) first, then go; returns false at a wall
+    function walk(dx, dy, sp) {
+      const c = col(), r = row(), lx = c * T + LX, ly = r * T + OY + LY;
+      if (dx) {
+        const wall = blocked(c + dx, r);
+        if (wall && (lx - p.x) * dx <= 0) return false;
+        const off = ly - p.y, m = Math.min(Math.abs(off), sp);
+        if (m >= Math.abs(off)) p.y = ly; else p.y += Math.sign(off) * m;
+        sp -= m;
+        p.x += dx * sp;
+        if (wall && (lx - p.x) * dx < 0) p.x = lx;
+      } else {
+        const wall = blocked(c, r + dy);
+        if (wall && (ly - p.y) * dy <= 0) return false;
+        const off = lx - p.x, m = Math.min(Math.abs(off), sp);
+        if (m >= Math.abs(off)) p.x = lx; else p.x += Math.sign(off) * m;
+        sp -= m;
+        p.y += dy * sp;
+        if (wall && (ly - p.y) * dy < 0) p.y = ly;
+      }
+      return true;
+    }
+
     function reset() {
-      p = { x: start[0] * T + 3, y: start[1] * T + OY + 5, w: 10, h: 10, face: 'down', anim: 0, inv: 0 };
+      p = { x: start[0] * T + LX, y: start[1] * T + OY + LY, w: 10, h: 10, face: 'down', anim: 0, inv: 0 };
       hearts = 3;
       slimes = SLIMES.map(([x, y]) => ({ x: x * T + 2, y: y * T + OY + 4, w: 12, h: 10, dx: 0, dy: 0, t: 0, alive: true, anim: Math.random() * 3 }));
     }
@@ -91,16 +119,23 @@
 
         // movement
         const I = Input.held;
+        if (Input.pressed.left || Input.pressed.right) turn = 'x';
+        if (Input.pressed.up || Input.pressed.down) turn = 'y';
         let dx = 0, dy = 0;
         if (swing <= 0) {
           if (I.left) dx = -1; else if (I.right) dx = 1;
           if (I.up) dy = -1; else if (I.down) dy = 1;
         }
         if (dx || dy) {
-          const sp = 1.3 / (dx && dy ? 1.41 : 1);
-          if (dy < 0) p.face = 'up'; else if (dy > 0) p.face = 'down';
-          if (dx < 0 && !dy) p.face = 'left'; else if (dx > 0 && !dy) p.face = 'right';
-          moveBox(p, dx * sp, dy * sp);
+          const sp = 1.3;
+          // two directions held: the one pressed last wins wherever the maze lets it (that is how you take a turn)
+          let went = null;
+          for (const axis of (turn === 'y' ? 'yx' : 'xy')) {
+            if (axis === 'x' && dx && walk(dx, 0, sp)) { went = 'x'; break; }
+            if (axis === 'y' && dy && walk(0, dy, sp)) { went = 'y'; break; }
+          }
+          if (!went) went = dy ? 'y' : 'x'; // at a wall: just turn to face it
+          p.face = went === 'x' ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
           p.anim += 0.12;
         }
         if (p.inv > 0) p.inv--;
@@ -129,7 +164,9 @@
 
         // door
         const db = { x: doorPos[0] * T, y: doorPos[1] * T + OY, w: 16, h: 18 };
-        if (!doorOpen && Plat.overlap({ x: p.x, y: p.y - 2, w: p.w, h: p.h }, db)) {
+        // the hero stays on the lane below the door, so the door answers to pushing up at it
+        const atDoor = col() === doorPos[0] && row() === doorPos[1] + 1 && Input.held.up && swing <= 0;
+        if (!doorOpen && atDoor) {
           if (hasKey) { doorOpen = true; GameAudio.sfx('door'); setTimeout(() => GameAudio.sfx('secret'), 250); state = 'exit'; GameAudio.stopMusic(); p.x = doorPos[0] * T + 3; }
           else if (msgT <= 0) { say('LOCKED. EVEN DRACULA LOCKS HIS DOOR.'); GameAudio.sfx('bump'); }
         }
@@ -161,9 +198,15 @@
           if (p.inv <= 0 && Plat.overlap(p, s)) {
             hearts--; p.inv = 70; GameAudio.sfx('hurt');
             // knockback away from slime
-            const kx = Math.sign(p.x - s.x) * 3, ky = Math.sign(p.y - s.y) * 3;
-            for (let k = 0; k < 5; k++) moveBox(p, kx, ky);
-            s.dx = -Math.sign(kx) || s.dx; s.dy = -Math.sign(ky) || s.dy; s.t = 60; // bear backs off
+            const kx = Math.sign(p.x - s.x), ky = Math.sign(p.y - s.y);
+            // along the lanes: away from the bear on the axis where it is further off, else on the other one
+            const tries = Math.abs(p.x - s.x) >= Math.abs(p.y - s.y) ? [[kx, 0], [0, ky]] : [[0, ky], [kx, 0]];
+            for (const [ax, ay] of tries) {
+              if (!(ax || ay) || !walk(ax, ay, 3)) continue;
+              for (let k = 0; k < 4; k++) walk(ax, ay, 3);
+              break;
+            }
+            s.dx = -kx || s.dx; s.dy = -ky || s.dy; s.t = 60; // bear backs off
             if (hearts <= 0) { state = 'gameover'; stateT = 0; Game.fail(); GameAudio.stopMusic(); say('BEAR HUG! TRY AGAIN'); }
           }
         }

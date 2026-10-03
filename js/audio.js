@@ -54,7 +54,7 @@
   let current = null, voices = [], timer = null;
 
   function ensure() {
-    if (ac) { if (ac.state === 'suspended') ac.resume(); return true; }
+    if (ac) { if (ac.state !== 'running') { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); } return true; } // iOS also has 'interrupted' (lock screen, call)
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
