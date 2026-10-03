@@ -18,10 +18,13 @@
     level: 0,            // current level index, 5 = final
     fails: 0,
     overlay: null,       // {text, sub, timer, then}
+    pause: null,         // {cursor, prize} while the START menu is open
 
     go(scene) {
       Game.scene = scene;
       Game.overlay = null;
+      Game.pause = null;
+      document.getElementById('prize').classList.add('hidden');
       document.body.classList.toggle('four-way', !!scene.fourWay); // touch pad shows up/down only where needed
       Game.layout();
       if (scene.enter) scene.enter();
@@ -77,6 +80,7 @@
     let heroX = -20, frame = 0;
     return {
       wide: true,
+      noPause: true,
       music: undefined, // no music until first input (iOS needs a gesture)
       update() {
         heroX += 0.8; if (heroX > Game.W + 20) heroX = -20;
@@ -119,6 +123,7 @@
     let timer = 0;
     return {
       music: null,
+      noPause: true,
       update() {
         timer++;
         if (timer > 170 || (timer > 20 && Input.ok())) Game.go(Game.levels[i]());
@@ -134,6 +139,55 @@
         lines.forEach((l, k) => Game.text(l, W / 2, 180 + k * 12, '#fff', 1, 'center'));
       },
     };
+  }
+
+  // ---------------- pause menu (START): resume / restart level / new game ----------------
+  const PAUSE_ITEMS = ['RESUME', 'RESTART LEVEL', 'NEW GAME'];
+  const PM = { x: 48, y: 68, w: 160, h: 104, rowY: 108, rowH: 18 };
+  const prizeEl = document.getElementById('prize');
+
+  function openPause() {
+    // the prize (QR + CLAIM) is html on top of the canvas, so it steps aside while the menu is open
+    Game.pause = { cursor: 0, prize: !prizeEl.classList.contains('hidden') };
+    prizeEl.classList.add('hidden');
+    document.body.classList.add('four-way'); // the menu needs up/down on the touch pad
+    GameAudio.sfx('select');
+  }
+
+  function closePause() {
+    if (Game.pause.prize) prizeEl.classList.remove('hidden');
+    Game.pause = null;
+    document.body.classList.toggle('four-way', !!Game.scene.fourWay);
+  }
+
+  function updatePause() {
+    const m = Game.pause, n = PAUSE_ITEMS.length;
+    if (Input.pressed.start) { closePause(); return; }
+    if (Input.pressed.up) { m.cursor = (m.cursor + n - 1) % n; GameAudio.sfx('select'); }
+    if (Input.pressed.down) { m.cursor = (m.cursor + 1) % n; GameAudio.sfx('select'); }
+    let pick = Input.pressed.a ? m.cursor : -1;
+    if (Input.pressed.tap) {
+      const tx = Input.tapX + Game.viewX - Math.floor((Game.CW - W) / 2);
+      const row = Math.floor((Input.tapY - PM.rowY + 5) / PM.rowH);
+      if (tx >= PM.x && tx <= PM.x + PM.w && row >= 0 && row < n) pick = row;
+    }
+    if (pick < 0) return;
+    GameAudio.sfx('confirm');
+    if (pick === 0) closePause();
+    else Game.startLevel(pick === 1 ? Game.level : 0);
+  }
+
+  function drawPause() {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, Game.CW, H);
+    ctx.save(); ctx.translate(Math.floor((Game.CW - W) / 2), 0);
+    Game.box(PM.x, PM.y, PM.w, PM.h, '#000', '#fff');
+    Game.text('PAUSE', W / 2, PM.y + 12, '#fcd000', 2, 'center');
+    PAUSE_ITEMS.forEach((s, k) => {
+      const y = PM.rowY + k * PM.rowH, on = k === Game.pause.cursor;
+      if (on) Game.text('>', PM.x + 22, y, '#fcd000');
+      Game.text(s, PM.x + 34, y, on ? '#fff' : '#bcbcbc');
+    });
+    ctx.restore();
   }
 
   // ---------------- main loop (fixed 60 fps steps) ----------------
@@ -152,9 +206,13 @@
       acc -= STEP;
       Game.t += STEP;
       Input.poll();
-      if (Game.overlay) {
+      if (Game.pause) {
+        updatePause();
+      } else if (Game.overlay) {
         const o = Game.overlay;
         if (--o.timer <= 0) { Game.overlay = null; o.then(); }
+      } else if (Input.pressed.start && Game.scene && !Game.scene.noPause) {
+        openPause();
       } else if (Game.scene && Game.scene.update) {
         Game.scene.update(STEP);
       }
@@ -180,6 +238,7 @@
       Game.text(o.sub, W / 2, 128, '#fff', 1, 'center');
       ctx.restore();
     }
+    if (Game.pause) drawPause();
   }
 
   // fit the canvas into the available area: height stays 240, on a phone the width grows (256..320)
